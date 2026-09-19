@@ -17,38 +17,38 @@ public class ServicoController {
     @PostMapping
     public ResponseEntity<Servico> criarServico(@RequestBody Servico servico) {
         Servico servicoSalvo = servicoRepository.salvar(servico);
-        return ResponseEntity.status(HttpStatus.CREATED).body(servicoSalvo); // Retorna 201 Created
+        return ResponseEntity.status(HttpStatus.CREATED).body(servicoSalvo);
     }
 
 
     @GetMapping
     public ResponseEntity<List<Servico>> listarTodos() {
-        return ResponseEntity.ok(servicoRepository.buscarTodos()); // Retorna 200 OK
+        return ResponseEntity.ok(servicoRepository.buscarTodos());
     }
 
 
     @GetMapping("/{id}")
     public ResponseEntity<Servico> buscarPorId(@PathVariable Long id) {
         return servicoRepository.buscarPorId(id)
-                .map(ResponseEntity::ok) // Retorna 200 OK se encontrar
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()); // Retorna 404 Not Found
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
 
     @PutMapping("/{id}")
     public ResponseEntity<Servico> atualizarServico(@PathVariable Long id, @RequestBody Servico servico) {
         return servicoRepository.atualizar(id, servico)
-                .map(ResponseEntity::ok) // Retorna 200 OK
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()); // Retorna 404 Not Found
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarServico(@PathVariable Long id) {
         if (servicoRepository.deletar(id)) {
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build(); // Retorna 204 No Content
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // Retorna 404 Not Found
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 }

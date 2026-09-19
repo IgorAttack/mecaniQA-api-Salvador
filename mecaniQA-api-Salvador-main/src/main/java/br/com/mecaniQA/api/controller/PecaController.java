@@ -17,35 +17,35 @@ public class PecaController {
     @PostMapping
     public ResponseEntity<Peca> criarPeca(@RequestBody Peca peca) {
         Peca pecaSalva = pecaRepository.salvar(peca);
-        return ResponseEntity.status(HttpStatus.CREATED).body(pecaSalva); // Retorna 201 Created
+        return ResponseEntity.status(HttpStatus.CREATED).body(pecaSalva);
     }
 
     @GetMapping
     public ResponseEntity<List<Peca>> listarTodas() {
-        return ResponseEntity.ok(pecaRepository.buscarTodas()); // Retorna 200 OK
+        return ResponseEntity.ok(pecaRepository.buscarTodas());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Peca> buscarPorId(@PathVariable Long id) {
         return pecaRepository.buscarPorId(id)
-                .map(ResponseEntity::ok) // Retorna 200 OK se encontrar
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()); // Retorna 404 Not Found se não achar
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Peca> atualizarPeca(@PathVariable Long id, @RequestBody Peca peca) {
         return pecaRepository.atualizar(id, peca)
-                .map(ResponseEntity::ok) // Retorna 200 OK
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()); // Retorna 404 Not Found
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarPeca(@PathVariable Long id) {
         if (pecaRepository.deletar(id)) {
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).build(); // Retorna 204 No Content para deleção bem sucedida
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build(); // Retorna 404 se não encontrou o ID para deletar
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 }

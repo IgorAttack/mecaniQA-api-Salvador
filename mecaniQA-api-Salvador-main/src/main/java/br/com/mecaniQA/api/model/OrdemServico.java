@@ -16,7 +16,7 @@ public class OrdemServico {
     private List<Servico> servicos;
     private List<PedidoPecas> pedidosPecas;
 
-    // Construtor privado
+
     private OrdemServico(Builder builder) {
         this.codigoUnico = builder.codigoUnico;
         this.descricaoProblema = builder.descricaoProblema;
@@ -29,12 +29,12 @@ public class OrdemServico {
         this.pedidosPecas = builder.pedidosPecas;
     }
 
-    // Método para iniciar o Builder
+
     public static Builder builder() {
         return new Builder();
     }
 
-    // Builder
+
     public static class Builder {
 
         private Long codigoUnico;
@@ -97,7 +97,7 @@ public class OrdemServico {
         }
     }
 
-    // Getters e Setters
+
 
     public Long getCodigoUnico() {
         return codigoUnico;
