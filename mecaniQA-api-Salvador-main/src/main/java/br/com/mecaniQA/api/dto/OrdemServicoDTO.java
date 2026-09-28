@@ -2,6 +2,8 @@ package br.com.mecaniQA.api.dto;
 
 import br.com.mecaniQA.api.model.StatusOrdemServico;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class OrdemServicoDTO {
 
@@ -10,18 +12,14 @@ public class OrdemServicoDTO {
     private StatusOrdemServico status;
     private Double valorTotal;
     private LocalDateTime dataAbertura;
+    private List<Long> servicosIds;
+    private List<Long> pedidosPecasIds;
 
-    public OrdemServicoDTO() {}
-
-    public OrdemServicoDTO(Long codigoUnico, String descricaoProblema, StatusOrdemServico status, Double valorTotal, LocalDateTime dataAbertura) {
-        this.codigoUnico = codigoUnico;
-        this.descricaoProblema = descricaoProblema;
-        this.status = status;
-        this.valorTotal = valorTotal;
-        this.dataAbertura = dataAbertura;
+    public OrdemServicoDTO() {
+        this.servicosIds = new ArrayList<>();
+        this.pedidosPecasIds = new ArrayList<>();
     }
 
-    // Getters e Setters manuais
     public Long getCodigoUnico() { return codigoUnico; }
     public void setCodigoUnico(Long codigoUnico) { this.codigoUnico = codigoUnico; }
 
@@ -36,4 +34,10 @@ public class OrdemServicoDTO {
 
     public LocalDateTime getDataAbertura() { return dataAbertura; }
     public void setDataAbertura(LocalDateTime dataAbertura) { this.dataAbertura = dataAbertura; }
+
+    public List<Long> getServicosIds() { return servicosIds; }
+    public void setServicosIds(List<Long> servicosIds) { this.servicosIds = servicosIds; }
+
+    public List<Long> getPedidosPecasIds() { return pedidosPecasIds; }
+    public void setPedidosPecasIds(List<Long> pedidosPecasIds) { this.pedidosPecasIds = pedidosPecasIds; }
 }
