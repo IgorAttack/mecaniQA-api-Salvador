@@ -1,6 +1,7 @@
 package br.com.mecaniQA.api.repository;
 
 import br.com.mecaniQA.api.config.DatabaseConnection;
+import br.com.mecaniQA.api.mapper.jdbc.PecaResultSetMapper;
 import br.com.mecaniQA.api.model.Peca;
 
 import java.sql.*;
@@ -56,7 +57,7 @@ public class PecaRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                pecas.add(mapearPeca(rs));
+                pecas.add(PecaResultSetMapper.map(rs));
             }
         } catch (SQLException e) {
             throw new RuntimeException("Erro ao listar Peças.", e);
@@ -73,7 +74,7 @@ public class PecaRepository {
             stmt.setLong(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapearPeca(rs));
+                    return Optional.of(PecaResultSetMapper.map(rs));
                 }
             }
         } catch (SQLException e) {
@@ -120,25 +121,4 @@ public class PecaRepository {
         }
     }
 
-    private Peca mapearPeca(ResultSet rs) throws SQLException {
-        // Usa o construtor da classe Model, passando nulo para campos ainda não persistidos no BD inicial
-        Peca peca = new Peca(
-                rs.getString("nome"),
-                null,
-                null,
-                0,
-                0.0,
-                rs.getDouble("preco"),
-                null
-        );
-        peca.setCodigoUnico(rs.getLong("codigo_unico"));
-
-        if (rs.getTimestamp("data_cadastro") != null) {
-            peca.setDataCadastro(rs.getTimestamp("data_cadastro").toLocalDateTime());
-        }
-        if (rs.getTimestamp("data_ultima_atualizacao") != null) {
-            peca.setDataUltimaAtualizacao(rs.getTimestamp("data_ultima_atualizacao").toLocalDateTime());
-        }
-        return peca;
-    }
 }
