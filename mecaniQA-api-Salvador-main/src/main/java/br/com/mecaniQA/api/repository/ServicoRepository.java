@@ -1,15 +1,16 @@
 package br.com.mecaniQA.api.repository;
 
-import br.com.mecaniQA.api.config.DatabaseConnection;
 import br.com.mecaniQA.api.model.Servico;
 
-import java.sql.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class ServicoRepository {
+public class ServicoRepository extends AbstractJdbcRepository<Servico, Long> {
 
     private static ServicoRepository instance;
 
@@ -22,106 +23,62 @@ public class ServicoRepository {
         return instance;
     }
 
+    @Override
     public Servico salvar(Servico servico) {
-        String sql = "INSERT INTO servicos (nome, preco, data_criacao) VALUES (?, ?, ?)";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            servico.setDataCriacao(LocalDateTime.now());
-
-            stmt.setString(1, servico.getNomeServico());
-            stmt.setDouble(2, servico.getCustoTabelado() != null ? servico.getCustoTabelado() : 0.0);
-            stmt.setTimestamp(3, Timestamp.valueOf(servico.getDataCriacao()));
-
-            stmt.executeUpdate();
-
-            try (ResultSet rs = stmt.getGeneratedKeys()) {
-                if (rs.next()) {
-                    servico.setCodigoUnico(rs.getLong(1));
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao salvar Serviço.", e);
-        }
-        return servico;
+        servico.setDataCriacao(LocalDateTime.now());
+        return executarSalvar(
+                "INSERT INTO servicos (nome, preco, data_criacao) VALUES (?, ?, ?)",
+                servico,
+                stmt -> {
+                    stmt.setString(1, servico.getNomeServico());
+                    stmt.setDouble(2, servico.getCustoTabelado() != null ? servico.getCustoTabelado() : 0.0);
+                    stmt.setTimestamp(3, Timestamp.valueOf(servico.getDataCriacao()));
+                },
+                (rs, entidade) -> entidade.setCodigoUnico(rs.getLong(1))
+        );
     }
 
-    public List<Servico> buscarTodos() {
-        List<Servico> servicos = new ArrayList<>();
-        String sql = "SELECT * FROM servicos";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                servicos.add(mapearServico(rs));
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao listar Serviços.", e);
-        }
-        return servicos;
-    }
-
+    @Override
     public Optional<Servico> buscarPorId(Long id) {
-        String sql = "SELECT * FROM servicos WHERE codigo_unico = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapearServico(rs));
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar Serviço.", e);
-        }
-        return Optional.empty();
+        return executarBuscaPorId(
+                "SELECT * FROM servicos WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id),
+                this::mapear
+        );
     }
 
+    @Override
+    public List<Servico> buscarTodos() {
+        return executarBuscaTodos("SELECT * FROM servicos", this::mapear);
+    }
+
+    @Override
     public Optional<Servico> atualizar(Long id, Servico servico) {
-        String sql = "UPDATE servicos SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?";
+        servico.setDataUltimaAtualizacao(LocalDateTime.now());
+        servico.setCodigoUnico(id);
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        int linhas = executarUpdate(
+                "UPDATE servicos SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?",
+                stmt -> {
+                    stmt.setString(1, servico.getNomeServico());
+                    stmt.setDouble(2, servico.getCustoTabelado() != null ? servico.getCustoTabelado() : 0.0);
+                    stmt.setTimestamp(3, Timestamp.valueOf(servico.getDataUltimaAtualizacao()));
+                    stmt.setLong(4, id);
+                }
+        );
 
-            servico.setDataUltimaAtualizacao(LocalDateTime.now());
-
-            stmt.setString(1, servico.getNomeServico());
-            stmt.setDouble(2, servico.getCustoTabelado() != null ? servico.getCustoTabelado() : 0.0);
-            stmt.setTimestamp(3, Timestamp.valueOf(servico.getDataUltimaAtualizacao()));
-            stmt.setLong(4, id);
-
-            int rows = stmt.executeUpdate();
-            if (rows > 0) {
-                servico.setCodigoUnico(id);
-                return Optional.of(servico);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao atualizar Serviço.", e);
-        }
-        return Optional.empty();
+        return linhas > 0 ? Optional.of(servico) : Optional.empty();
     }
 
+    @Override
     public boolean deletar(Long id) {
-        String sql = "DELETE FROM servicos WHERE codigo_unico = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, id);
-            return stmt.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao deletar Serviço.", e);
-        }
+        return executarDelete(
+                "DELETE FROM servicos WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id)
+        );
     }
 
-    private Servico mapearServico(ResultSet rs) throws SQLException {
-        // Usa o construtor da classe Model, passando 0 para o tempo estimado como padrão caso não tenha no DB
+    private Servico mapear(ResultSet rs) throws SQLException {
         Servico servico = new Servico(rs.getString("nome"), 0, rs.getDouble("preco"));
         servico.setCodigoUnico(rs.getLong("codigo_unico"));
 

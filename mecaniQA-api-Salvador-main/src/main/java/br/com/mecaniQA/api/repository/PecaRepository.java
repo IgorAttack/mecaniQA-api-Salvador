@@ -1,16 +1,17 @@
 package br.com.mecaniQA.api.repository;
 
-import br.com.mecaniQA.api.config.DatabaseConnection;
 import br.com.mecaniQA.api.mapper.jdbc.PecaResultSetMapper;
 import br.com.mecaniQA.api.model.Peca;
 
-import java.sql.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class PecaRepository {
+public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
 
     private static PecaRepository instance;
 
@@ -23,102 +24,59 @@ public class PecaRepository {
         return instance;
     }
 
+    @Override
     public Peca salvar(Peca peca) {
-        String sql = "INSERT INTO pecas (nome, preco, data_cadastro) VALUES (?, ?, ?)";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-            peca.setDataCadastro(LocalDateTime.now());
-
-            stmt.setString(1, peca.getNome());
-            stmt.setDouble(2, peca.getPrecoVenda() != null ? peca.getPrecoVenda() : 0.0);
-            stmt.setTimestamp(3, Timestamp.valueOf(peca.getDataCadastro()));
-
-            stmt.executeUpdate();
-
-            try (ResultSet rs = stmt.getGeneratedKeys()) {
-                if (rs.next()) {
-                    peca.setCodigoUnico(rs.getLong(1));
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao salvar a Peça no banco de dados.", e);
-        }
-        return peca;
+        peca.setDataCadastro(LocalDateTime.now());
+        return executarSalvar(
+                "INSERT INTO pecas (nome, preco, data_cadastro) VALUES (?, ?, ?)",
+                peca,
+                stmt -> {
+                    stmt.setString(1, peca.getNome());
+                    stmt.setDouble(2, peca.getPrecoVenda() != null ? peca.getPrecoVenda() : 0.0);
+                    stmt.setTimestamp(3, Timestamp.valueOf(peca.getDataCadastro()));
+                },
+                (rs, entidade) -> entidade.setCodigoUnico(rs.getLong(1))
+        );
     }
 
-    public List<Peca> buscarTodas() {
-        List<Peca> pecas = new ArrayList<>();
-        String sql = "SELECT * FROM pecas";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                pecas.add(PecaResultSetMapper.map(rs));
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao listar Peças.", e);
-        }
-        return pecas;
-    }
-
+    @Override
     public Optional<Peca> buscarPorId(Long id) {
-        String sql = "SELECT * FROM pecas WHERE codigo_unico = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(PecaResultSetMapper.map(rs));
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar Peça por ID.", e);
-        }
-        return Optional.empty();
+        return executarBuscaPorId(
+                "SELECT * FROM pecas WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id),
+                PecaResultSetMapper::map
+        );
     }
 
+    @Override
+    public List<Peca> buscarTodos() {
+        return executarBuscaTodos("SELECT * FROM pecas", PecaResultSetMapper::map);
+    }
+
+    @Override
     public Optional<Peca> atualizar(Long id, Peca peca) {
-        String sql = "UPDATE pecas SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?";
+        peca.setDataUltimaAtualizacao(LocalDateTime.now());
+        peca.setCodigoUnico(id);
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        int linhas = executarUpdate(
+                "UPDATE pecas SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?",
+                stmt -> {
+                    stmt.setString(1, peca.getNome());
+                    stmt.setDouble(2, peca.getPrecoVenda() != null ? peca.getPrecoVenda() : 0.0);
+                    stmt.setTimestamp(3, Timestamp.valueOf(peca.getDataUltimaAtualizacao()));
+                    stmt.setLong(4, id);
+                }
+        );
 
-            peca.setDataUltimaAtualizacao(LocalDateTime.now());
-
-            stmt.setString(1, peca.getNome());
-            stmt.setDouble(2, peca.getPrecoVenda() != null ? peca.getPrecoVenda() : 0.0);
-            stmt.setTimestamp(3, Timestamp.valueOf(peca.getDataUltimaAtualizacao()));
-            stmt.setLong(4, id);
-
-            int affectedRows = stmt.executeUpdate();
-            if (affectedRows > 0) {
-                peca.setCodigoUnico(id);
-                return Optional.of(peca);
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao atualizar a Peça.", e);
-        }
-        return Optional.empty();
+        return linhas > 0 ? Optional.of(peca) : Optional.empty();
     }
 
+
+    @Override
     public boolean deletar(Long id) {
-        String sql = "DELETE FROM pecas WHERE codigo_unico = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setLong(1, id);
-            return stmt.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao deletar a Peça.", e);
-        }
+        return executarDelete(
+                "DELETE FROM pecas WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id)
+        );
     }
-
 }

@@ -19,7 +19,7 @@ public class PecaService {
     }
 
     public List<Peca> buscarTodas() {
-        return repository.buscarTodas();
+        return repository.buscarTodos();
     }
 
     public Peca buscarPorId(Long id) {

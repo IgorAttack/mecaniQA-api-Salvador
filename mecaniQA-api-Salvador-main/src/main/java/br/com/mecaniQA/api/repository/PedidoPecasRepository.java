@@ -1,16 +1,19 @@
 package br.com.mecaniQA.api.repository;
 
-import br.com.mecaniQA.api.config.DatabaseConnection;
 import br.com.mecaniQA.api.model.ItemPedidoPeca;
 import br.com.mecaniQA.api.model.Peca;
 import br.com.mecaniQA.api.model.PedidoPecas;
 import br.com.mecaniQA.api.model.StatusPedidoPecas;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-public class PedidoPecasRepository {
+public class PedidoPecasRepository extends AbstractJdbcRepository<PedidoPecas, Long> {
 
     private static PedidoPecasRepository instance;
 
@@ -23,142 +26,148 @@ public class PedidoPecasRepository {
         return instance;
     }
 
+    /**
+     * Salva o pedido e seus itens dentro de uma única transação.
+     * O algoritmo específico da entidade permanece no repositório, enquanto
+     * as consultas simples são centralizadas no Template Method.
+     */
+    @Override
     public PedidoPecas salvar(PedidoPecas pedido) {
-        Connection conn = null;
-        try {
-            conn = DatabaseConnection.getConnection();
-            conn.setAutoCommit(false); // Inicia a Transação (Garante que Cabeçalho e Itens salvem juntos)
-
-            // 1. Salva ou Atualiza o Cabeçalho do Pedido
+        return executarEmTransacao(connection -> {
             if (pedido.getCodigoUnico() == null) {
-                String sql = "INSERT INTO pedidos (fornecedor, status, valor_total, data_pedido) VALUES (?, ?, ?, ?)";
                 pedido.setDataPedido(LocalDateTime.now());
-
-                try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                    stmt.setString(1, pedido.getFornecedor());
-                    stmt.setString(2, pedido.getStatus() != null ? pedido.getStatus().name() : "ORCANDO");
-                    stmt.setDouble(3, pedido.getValorTotal() != null ? pedido.getValorTotal() : 0.0);
-                    stmt.setTimestamp(4, Timestamp.valueOf(pedido.getDataPedido()));
-                    stmt.executeUpdate();
-
-                    try (ResultSet rs = stmt.getGeneratedKeys()) {
-                        if (rs.next()) {
-                            pedido.setCodigoUnico(rs.getLong(1));
-                        }
-                    }
+                if (pedido.getStatus() == null) {
+                    pedido.setStatus(StatusPedidoPecas.ORCANDO);
                 }
+                if (pedido.getValorTotal() == null) {
+                    pedido.setValorTotal(0.0);
+                }
+
+                executarSalvar(
+                        connection,
+                        "INSERT INTO pedidos (fornecedor, status, valor_total, data_pedido) VALUES (?, ?, ?, ?)",
+                        pedido,
+                        stmt -> {
+                            stmt.setString(1, pedido.getFornecedor());
+                            stmt.setString(2, pedido.getStatus().name());
+                            stmt.setDouble(3, pedido.getValorTotal());
+                            stmt.setTimestamp(4, Timestamp.valueOf(pedido.getDataPedido()));
+                        },
+                        (rs, entidade) -> entidade.setCodigoUnico(rs.getLong(1))
+                );
             } else {
-                String sql = "UPDATE pedidos SET fornecedor = ?, status = ?, valor_total = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?";
                 pedido.setDataUltimaAtualizacao(LocalDateTime.now());
-
-                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                    stmt.setString(1, pedido.getFornecedor());
-                    stmt.setString(2, pedido.getStatus().name());
-                    stmt.setDouble(3, pedido.getValorTotal());
-                    stmt.setTimestamp(4, Timestamp.valueOf(pedido.getDataUltimaAtualizacao()));
-                    stmt.setLong(5, pedido.getCodigoUnico());
-                    stmt.executeUpdate();
+                if (pedido.getStatus() == null) {
+                    pedido.setStatus(StatusPedidoPecas.ORCANDO);
                 }
+                if (pedido.getValorTotal() == null) {
+                    pedido.setValorTotal(0.0);
+                }
+
+                executarUpdate(
+                        connection,
+                        "UPDATE pedidos SET fornecedor = ?, status = ?, valor_total = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?",
+                        stmt -> {
+                            stmt.setString(1, pedido.getFornecedor());
+                            stmt.setString(2, pedido.getStatus().name());
+                            stmt.setDouble(3, pedido.getValorTotal());
+                            stmt.setTimestamp(4, Timestamp.valueOf(pedido.getDataUltimaAtualizacao()));
+                            stmt.setLong(5, pedido.getCodigoUnico());
+                        }
+                );
             }
 
-            // 2. Limpa os itens antigos da entidade associativa para este pedido
-            String sqlDelete = "DELETE FROM itens_pedido_peca WHERE pedido_id = ?";
-            try (PreparedStatement stmtDel = conn.prepareStatement(sqlDelete)) {
-                stmtDel.setLong(1, pedido.getCodigoUnico());
-                stmtDel.executeUpdate();
-            }
+            executarUpdate(
+                    connection,
+                    "DELETE FROM itens_pedido_peca WHERE pedido_id = ?",
+                    stmt -> stmt.setLong(1, pedido.getCodigoUnico())
+            );
 
-            // 3. Insere a nova lista de itens usando processamento em Lote (Batch)
             if (pedido.getItens() != null && !pedido.getItens().isEmpty()) {
-                String sqlInsert = "INSERT INTO itens_pedido_peca (pedido_id, peca_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)";
-                try (PreparedStatement stmtIns = conn.prepareStatement(sqlInsert)) {
-                    for (ItemPedidoPeca item : pedido.getItens()) {
-                        stmtIns.setLong(1, pedido.getCodigoUnico());
-                        stmtIns.setLong(2, item.getPeca().getCodigoUnico());
-                        stmtIns.setInt(3, item.getQuantidade());
-                        stmtIns.setDouble(4, item.getPrecoUnitario());
-                        stmtIns.addBatch();
-                    }
-                    stmtIns.executeBatch();
+                for (ItemPedidoPeca item : pedido.getItens()) {
+                    executarUpdate(
+                            connection,
+                            "INSERT INTO itens_pedido_peca (pedido_id, peca_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)",
+                            stmt -> {
+                                stmt.setLong(1, pedido.getCodigoUnico());
+                                stmt.setLong(2, item.getPeca().getCodigoUnico());
+                                stmt.setInt(3, item.getQuantidade());
+                                stmt.setDouble(4, item.getPrecoUnitario());
+                            }
+                    );
                 }
             }
 
-            conn.commit(); // Confirma a Transação no banco
+            return pedido;
+        });
+    }
 
-        } catch (SQLException e) {
-            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
-            throw new RuntimeException("Erro ao salvar Pedido de Peças e seus itens.", e);
-        } finally {
-            if (conn != null) try {
-                conn.setAutoCommit(true);
-                conn.close();
-            } catch (SQLException ex) {}
+    @Override
+    public Optional<PedidoPecas> buscarPorId(Long id) {
+        return executarBuscaPorId(
+                "SELECT * FROM pedidos WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id),
+                this::mapear
+        );
+    }
+
+    @Override
+    public java.util.List<PedidoPecas> buscarTodos() {
+        return executarBuscaTodos("SELECT * FROM pedidos", this::mapear);
+    }
+
+    @Override
+    public Optional<PedidoPecas> atualizar(Long id, PedidoPecas pedido) {
+        pedido.setCodigoUnico(id);
+        return Optional.of(salvar(pedido));
+    }
+
+    @Override
+    public boolean deletar(Long id) {
+        return executarDelete(
+                "DELETE FROM pedidos WHERE codigo_unico = ?",
+                stmt -> stmt.setLong(1, id)
+        );
+    }
+
+    private PedidoPecas mapear(ResultSet rs) throws SQLException {
+        PedidoPecas pedido = new PedidoPecas(
+                rs.getString("fornecedor"),
+                StatusPedidoPecas.valueOf(rs.getString("status")),
+                rs.getDouble("valor_total")
+        );
+        pedido.setCodigoUnico(rs.getLong("codigo_unico"));
+
+        if (rs.getTimestamp("data_pedido") != null) {
+            pedido.setDataPedido(rs.getTimestamp("data_pedido").toLocalDateTime());
+        }
+        if (rs.getTimestamp("data_ultima_atualizacao") != null) {
+            pedido.setDataUltimaAtualizacao(rs.getTimestamp("data_ultima_atualizacao").toLocalDateTime());
         }
         return pedido;
     }
 
-    public Optional<PedidoPecas> buscarPorId(Long id) {
-        String sqlPedido = "SELECT * FROM pedidos WHERE codigo_unico = ?";
-        String sqlItens = "SELECT * FROM itens_pedido_peca WHERE pedido_id = ?";
+    @Override
+    protected void enriquecer(Connection connection, PedidoPecas pedido) throws SQLException {
+        String sql = "SELECT * FROM itens_pedido_peca WHERE pedido_id = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            PedidoPecas pedido = null;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, pedido.getCodigoUnico());
 
-            // Busca o cabeçalho
-            try (PreparedStatement stmt = conn.prepareStatement(sqlPedido)) {
-                stmt.setLong(1, id);
-                try (ResultSet rs = stmt.executeQuery()) {
-                    if (rs.next()) {
-                        pedido = new PedidoPecas(
-                                rs.getString("fornecedor"),
-                                StatusPedidoPecas.valueOf(rs.getString("status")),
-                                rs.getDouble("valor_total")
-                        );
-                        pedido.setCodigoUnico(rs.getLong("codigo_unico"));
-                        if (rs.getTimestamp("data_pedido") != null) {
-                            pedido.setDataPedido(rs.getTimestamp("data_pedido").toLocalDateTime());
-                        }
-                    }
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    Peca pecaMock = new Peca(null, null, null, 0, 0.0, 0.0, null);
+                    pecaMock.setCodigoUnico(rs.getLong("peca_id"));
+
+                    ItemPedidoPeca item = new ItemPedidoPeca(
+                            pedido,
+                            pecaMock,
+                            rs.getInt("quantidade"),
+                            rs.getDouble("preco_unitario")
+                    );
+                    pedido.getItens().add(item);
                 }
             }
-
-            // Busca os itens vinculados ao pedido
-            if (pedido != null) {
-                try (PreparedStatement stmt = conn.prepareStatement(sqlItens)) {
-                    stmt.setLong(1, id);
-                    try (ResultSet rs = stmt.executeQuery()) {
-                        while (rs.next()) {
-                            // Correção aplicada aqui: Usando o construtor com 7 argumentos passando null/0
-                            Peca pecaMock = new Peca(null, null, null, 0, 0.0, 0.0, null);
-                            pecaMock.setCodigoUnico(rs.getLong("peca_id"));
-
-                            ItemPedidoPeca item = new ItemPedidoPeca(
-                                    pedido,
-                                    pecaMock,
-                                    rs.getInt("quantidade"),
-                                    rs.getDouble("preco_unitario")
-                            );
-                            pedido.getItens().add(item);
-                        }
-                    }
-                }
-                return Optional.of(pedido);
-            }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao buscar Pedido de Peças.", e);
-        }
-        return Optional.empty();
-    }
-
-    public boolean deletar(Long id) {
-        String sql = "DELETE FROM pedidos WHERE codigo_unico = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(1, id);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            throw new RuntimeException("Erro ao deletar Pedido.", e);
         }
     }
 }
