@@ -1,17 +1,20 @@
 package br.com.mecaniQA.api.repository;
 
-import br.com.mecaniQA.api.mapper.jdbc.PecaResultSetMapper;
+import br.com.mecaniQA.api.mapper.JDBC.PecaResultSetMapper;
 import br.com.mecaniQA.api.model.Peca;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
+
+    private static final String SQL_INSERT = "INSERT INTO pecas (nome, preco, data_cadastro) VALUES (?, ?, ?)";
+    private static final String SQL_SELECT_ALL = "SELECT * FROM pecas";
+    private static final String SQL_SELECT_BY_ID = "SELECT * FROM pecas WHERE codigo_unico = ?";
+    private static final String SQL_UPDATE = "UPDATE pecas SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?";
+    private static final String SQL_DELETE = "DELETE FROM pecas WHERE codigo_unico = ?";
 
     private static PecaRepository instance;
 
@@ -28,7 +31,7 @@ public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
     public Peca salvar(Peca peca) {
         peca.setDataCadastro(LocalDateTime.now());
         return executarSalvar(
-                "INSERT INTO pecas (nome, preco, data_cadastro) VALUES (?, ?, ?)",
+                SQL_INSERT,
                 peca,
                 stmt -> {
                     stmt.setString(1, peca.getNome());
@@ -40,17 +43,21 @@ public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
     }
 
     @Override
-    public Optional<Peca> buscarPorId(Long id) {
-        return executarBuscaPorId(
-                "SELECT * FROM pecas WHERE codigo_unico = ?",
-                stmt -> stmt.setLong(1, id),
-                PecaResultSetMapper::map
-        );
+    public List<Peca> buscarTodos() {
+        return executarBuscaTodos(SQL_SELECT_ALL, PecaResultSetMapper::map);
+    }
+
+    public List<Peca> buscarTodas() {
+        return buscarTodos();
     }
 
     @Override
-    public List<Peca> buscarTodos() {
-        return executarBuscaTodos("SELECT * FROM pecas", PecaResultSetMapper::map);
+    public Optional<Peca> buscarPorId(Long id) {
+        return executarBuscaPorId(
+                SQL_SELECT_BY_ID,
+                stmt -> stmt.setLong(1, id),
+                PecaResultSetMapper::map
+        );
     }
 
     @Override
@@ -58,8 +65,8 @@ public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
         peca.setDataUltimaAtualizacao(LocalDateTime.now());
         peca.setCodigoUnico(id);
 
-        int linhas = executarUpdate(
-                "UPDATE pecas SET nome = ?, preco = ?, data_ultima_atualizacao = ? WHERE codigo_unico = ?",
+        int affectedRows = executarUpdate(
+                SQL_UPDATE,
                 stmt -> {
                     stmt.setString(1, peca.getNome());
                     stmt.setDouble(2, peca.getPrecoVenda() != null ? peca.getPrecoVenda() : 0.0);
@@ -68,14 +75,13 @@ public class PecaRepository extends AbstractJdbcRepository<Peca, Long> {
                 }
         );
 
-        return linhas > 0 ? Optional.of(peca) : Optional.empty();
+        return affectedRows > 0 ? Optional.of(peca) : Optional.empty();
     }
-
 
     @Override
     public boolean deletar(Long id) {
         return executarDelete(
-                "DELETE FROM pecas WHERE codigo_unico = ?",
+                SQL_DELETE,
                 stmt -> stmt.setLong(1, id)
         );
     }

@@ -1,4 +1,4 @@
-package br.com.mecaniQA.api.mapper.jdbc;
+package br.com.mecaniQA.api.mapper.JDBC;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;

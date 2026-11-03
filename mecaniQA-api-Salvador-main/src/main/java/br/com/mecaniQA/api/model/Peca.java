@@ -17,6 +17,9 @@ public class Peca {
     private String tamanho;
     private String cor;
 
+    public Peca() {
+    }
+
     public Peca(String nome, String codigoBarras, String fornecedorMarca,
                 Integer quantidadeEstoque, Double precoCusto, Double precoVenda,
                 CategoriaPeca categoria) {

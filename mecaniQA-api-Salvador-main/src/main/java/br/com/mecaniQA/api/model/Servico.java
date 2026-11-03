@@ -11,6 +11,9 @@ public class Servico {
     private LocalDateTime dataCriacao;
     private LocalDateTime dataUltimaAtualizacao;
 
+    public Servico() {
+    }
+
     public Servico(String nomeServico, Integer tempoEstimadoMinutos, Double custoTabelado) {
         this.nomeServico = nomeServico;
         this.tempoEstimadoMinutos = tempoEstimadoMinutos;

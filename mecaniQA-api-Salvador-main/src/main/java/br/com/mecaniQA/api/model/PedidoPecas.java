@@ -11,9 +11,12 @@ public class PedidoPecas {
     private StatusPedidoPecas status;
     private Double valorTotal;
     private LocalDateTime dataPedido;
-    private LocalDateTime dataRecebimento;
     private LocalDateTime dataUltimaAtualizacao;
-    private List<ItemPedidoPeca> itens;
+    private List<ItemPedidoPeca> itens = new ArrayList<>();
+
+    public PedidoPecas() {
+        this.itens = new ArrayList<>();
+    }
 
     public PedidoPecas(String fornecedor, StatusPedidoPecas status, Double valorTotal) {
         this.fornecedor = fornecedor;
@@ -37,14 +40,11 @@ public class PedidoPecas {
     public LocalDateTime getDataPedido() { return dataPedido; }
     public void setDataPedido(LocalDateTime dataPedido) { this.dataPedido = dataPedido; }
 
-    public LocalDateTime getDataRecebimento() { return dataRecebimento; }
-    public void setDataRecebimento(LocalDateTime dataRecebimento) { this.dataRecebimento = dataRecebimento; }
-
     public LocalDateTime getDataUltimaAtualizacao() { return dataUltimaAtualizacao; }
-    public void setDataUltimaAtualizacao(LocalDateTime dataUltimaAtualizacao) {
-        this.dataUltimaAtualizacao = dataUltimaAtualizacao;
-    }
+    public void setDataUltimaAtualizacao(LocalDateTime dataUltimaAtualizacao) { this.dataUltimaAtualizacao = dataUltimaAtualizacao; }
 
     public List<ItemPedidoPeca> getItens() { return itens; }
-    public void setItens(List<ItemPedidoPeca> itens) { this.itens = itens; }
+    public void setItens(List<ItemPedidoPeca> itens) {
+        this.itens = itens != null ? itens : new ArrayList<>();
+    }
 }
